@@ -1,0 +1,9 @@
+psycopg2
+asyncpg
+polars-lts-cpu
+numpy
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+
