@@ -5,5 +5,5 @@ numpy
 fastapi
 uvicorn
 pydantic
-sqlalchemy
+SQLAlchemy
 

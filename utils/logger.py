@@ -1,8 +1,12 @@
 import logging
 import logging.handlers
+import os
 
 
 def setup_logger(log_file='./log/api.log', level=logging.INFO):
+    log_dir = os.path.dirname(log_file)
+    os.makedirs(log_dir, exist_ok=True)
+
     logger = logging.getLogger(__name__) 
     logger.setLevel(level)
     
