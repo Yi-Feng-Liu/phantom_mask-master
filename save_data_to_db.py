@@ -141,7 +141,8 @@ class DatabaseManager:
             logger.info("SQLAlchemy pool disposed")
 
 
-async def get_db(first_time_execute: bool) -> DatabaseManager:
+
+async def get_db(first_time_execute: bool|None=None) -> DatabaseManager:
     db_config = DatabaseConfig(
         user="postgres",
         password="admin",
@@ -153,7 +154,8 @@ async def get_db(first_time_execute: bool) -> DatabaseManager:
     db_manager = DatabaseManager(db_config)
 
     try:
-        await db_manager.init_pool()
+        if first_time_execute is None or first_time_execute == False:
+            await db_manager.init_pool()
         if first_time_execute:
             await db_manager.check_n_create_database()
             await db_manager.check_n_create_tables()

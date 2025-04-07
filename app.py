@@ -33,7 +33,7 @@ async def read_root():
 async def get_open_pharmacies(
     time: str = Query(..., description="Time in HH:MM format"),
     day: Optional[str] = Query(..., description="Day of the week, e.g., Mon, Tue..."),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt = select(Pharmacies).where(Pharmacies.open_time <= time, Pharmacies.close_time >= time)
@@ -49,7 +49,7 @@ async def get_open_pharmacies(
 async def list_masks_in_pharmacy(
     pharmacy_name: str,
     sort_by: str = Query("name", regex="^(name|price)$"),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt = select(PharmaciesMask).where(PharmaciesMask.name == pharmacy_name).order_by(getattr(PharmaciesMask, sort_by))
@@ -67,7 +67,7 @@ async def pharmacies_by_mask_count(
     count: int = Query(..., ge=0),
     min_price: Decimal = Query(0),
     max_price: Decimal = Query(10000),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt = select(Pharmacies.id, Pharmacies.name).join(PharmaciesMask, Pharmacies.name == PharmaciesMask.name)
@@ -97,7 +97,7 @@ async def top_users_by_transaction(
     top_x: int = Query(..., gt=0),
     start_date: date = Query(..., description="Start date in format YYYY-MM-DD"),
     end_date: date = Query(..., description="end_date date in format YYYY-MM-DD"),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt = select(Users.name, func.sum(UsersPurchaseHistory.trn_amount).label("total")).join(Users).where(
@@ -117,7 +117,7 @@ async def top_users_by_transaction(
 async def transaction_summary(
     start_date: date = Query(..., description="Start date in format YYYY-MM-DD"),
     end_date: date = Query(..., description="Start date in format YYYY-MM-DD"),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt = select(func.count(UsersPurchaseHistory.id), func.sum(UsersPurchaseHistory.trn_amount)).where(
@@ -138,7 +138,7 @@ async def transaction_summary(
 )
 async def search_items(
     keyword: str = Query(...),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         stmt1 = select(Pharmacies.name).where(Pharmacies.name.ilike(f"%{keyword}%")).distinct()
@@ -161,7 +161,7 @@ async def purchase_mask(
     user_id: int = Query(...),
     pharmacy_id: int = Query(...),
     mask_id: int = Query(...),
-    db_manager: DatabaseManager = Depends(get_db)
+    db_manager: DatabaseManager = Depends(lambda: get_db(first_time_execute=False))
 ):
     async with db_manager.get_session() as db:
         async with db.begin():
