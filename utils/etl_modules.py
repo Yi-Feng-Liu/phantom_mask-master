@@ -182,7 +182,8 @@ class ParseUserInfo(ParsePharmaciesInfo):
         ```python
         
         user_info = ParseUserInfo(user_info)
-        for record in user_info.get_user_purchase_history:
+        user_purchase_history = user_info.get_user_purchase_history()
+        async for record in user_info.get_user_purchase_history:
             print(record)
             
         # the output will be like:
@@ -216,6 +217,7 @@ class ParseUserInfo(ParsePharmaciesInfo):
                 insert_table_schema["pharmacies_mask"] = mask_info
                 insert_table_schema["trn_amount"] = purchase_history.get("transactionAmount")
                 insert_table_schema["trn_date"] = datetime.strptime(purchase_history.get("transactionDate"), "%Y-%m-%d %H:%M:%S")
+                
                 yield insert_table_schema.copy()
         else:
             yield insert_table_schema
