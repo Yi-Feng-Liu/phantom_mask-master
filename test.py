@@ -1,17 +1,28 @@
-from utils.etl_modules import ParsePharmaciesInfo, ParseUserInfo
-import json
-import asyncio
+import psycopg2
 
-async def main():
-    with open("./data/users.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
+# PostgreSQL 連線設定
+conn = psycopg2.connect(
+    host="10.88.26.119",
+    port="5432",
+    database="mydatabase",
+    user="postgres",
+    password="admin"
+)
 
-    for ele in data:
-        user_info = ParseUserInfo(ele)
-        async for d in user_info.get_user_purchase_history():
-            print(d)
-        
-        
-if __name__ == "__main__":
-    # test
-    asyncio.run(main())
+# 建立遊標
+cursor = conn.cursor()
+
+# 執行 SQL 查詢
+cursor.execute("SELECT * FROM users_purchase_history")
+
+# 獲取資料庫中的所有資料表
+# cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+
+# 獲取查詢結果
+rows = cursor.fetchall()
+for row in rows:
+    print(row)
+
+# 關閉連線和遊標
+cursor.close()
+conn.close()
