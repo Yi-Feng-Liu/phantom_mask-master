@@ -46,7 +46,7 @@ class DatabaseManager:
         logger.info("SQLAlchemy pool initialized")
 
     
-    async def init_sync_tables(self):
+    async def del_tables(self):
         async with self.engine.begin() as conn:
             try:
                 table_names = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
@@ -64,7 +64,6 @@ class DatabaseManager:
     async def check_n_create_tables(self):
         try:
             async with self.engine.begin() as conn:
-                # 獲取現有表
                 result = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
                 logger.info(f'There are {len(result)} tables in the database.')
 
@@ -89,22 +88,27 @@ class DatabaseManager:
     async def check_n_create_database(self):
         async with self.engine.begin() as conn:
             try:
-                # 檢查資料庫是否存在
-                result = await conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": self.config.db_name})
+                db_name = "mydatabase"
+                result = await conn.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                    {"db_name": db_name}
+                )
                 if result.scalar():
-                    logger.info(f"Database {self.config.db_name} already exists")
+                    logger.info(f"Database {db_name} already exists")
                 else:
-                    # 創建資料庫
-                    await conn.execute(text(f'CREATE DATABASE "{self.config.db_name}"'))
-                    
-                    # 檢查資料庫創建是否成功
-                    result_check = await conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": self.config.db_name})
+                    await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+
+                    result_check = await conn.execute(
+                        text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                        {"db_name": db_name}
+                    )
                     if result_check.scalar():
-                        logger.info(f"Database {self.config.db_name} has been created")
+                        logger.info(f"Database {db_name} has been created")
                     else:
-                        logger.error(f"Database {self.config.db_name} creation failed")
+                        logger.error(f"Database {db_name} creation failed")
             except Exception as e:
                 logger.error(f"Cannot connect to PostgreSQL. Please check your configuration: {type(e).__name__}, {e}")
+
 
     
     @asynccontextmanager
@@ -137,11 +141,11 @@ class DatabaseManager:
             logger.info("SQLAlchemy pool disposed")
 
 
-async def get_db() -> DatabaseManager:
+async def get_db(first_time_execute: bool) -> DatabaseManager:
     db_config = DatabaseConfig(
         user="postgres",
         password="admin",
-        host="10.88.26.119",
+        host="localhost",
         port=5432,
         db_name="mydatabase"
     )
@@ -150,8 +154,9 @@ async def get_db() -> DatabaseManager:
 
     try:
         await db_manager.init_pool()
-        await db_manager.check_n_create_database()
-        await db_manager.check_n_create_tables()
+        if first_time_execute:
+            await db_manager.check_n_create_database()
+            await db_manager.check_n_create_tables()
         return db_manager
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
@@ -169,7 +174,7 @@ def load_json_file(file_path):
 
         
 async def Insert_pharmacies_data_to_db():
-    db_manager = await get_db()
+    db_manager = await get_db(first_time_execute=False)
     pharmacies_data = load_json_file("./data/pharmacies.json")
     
     if db_manager:
@@ -188,7 +193,7 @@ async def Insert_pharmacies_data_to_db():
 
 
 async def Insert_users_data_to_db():
-    db_manager = await get_db()
+    db_manager = await get_db(first_time_execute=False)
     users_data = load_json_file("./data/users.json")
     if db_manager:
         async with db_manager.get_session() as session:
@@ -243,6 +248,7 @@ async def Insert_users_data_to_db():
 
 
 async def main():
+    await get_db(first_time_execute=True)
     await Insert_pharmacies_data_to_db()
     await Insert_users_data_to_db()
 
@@ -250,7 +256,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
 

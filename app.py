@@ -7,7 +7,7 @@ from typing import  Optional
 from datetime import datetime, date
 from decimal import Decimal
 from utils.db_models import Pharmacies, PharmaciesCash, PharmaciesMask, Users, UsersPurchaseHistory
-from fastapi.responses import JSONResponse
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -151,6 +151,7 @@ async def search_items(
         }
 
 
+# The purchase_mask API still has some bugs that need to be fixed
 @app.post(
     path="/purchase", 
     summary="User purchases a mask", 

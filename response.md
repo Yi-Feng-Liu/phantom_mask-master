@@ -3,19 +3,19 @@
 ## A. Required Information
 ### A.1. Requirement Completion Rate
 - [x] List all pharmacies open at a specific time and on a day of the week if requested.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] List all masks sold by a given pharmacy, sorted by mask name or price.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] List all pharmacies with more or less than x mask products within a price range.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] The top x users by total transaction amount of masks within a date range.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] The total number of masks and dollar value of transactions within a date range.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] Search for pharmacies or masks by name, ranked by relevance to the search term.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 - [x] Process a user purchases a mask from a pharmacy, and handle all relevant data changes in an atomic transaction.
-  - Implemented at xxx API.
+  - Implemented at Fast API.
 ### A.2. API Document
 > Please describe how to use the API in the API documentation. You can edit by any format (e.g., Markdown or OpenAPI) or free tools (e.g., [hackMD](https://hackmd.io/), [postman](https://www.postman.com/), [google docs](https://docs.google.com/document/u/0/), or  [swagger](https://swagger.io/specification/)).
 
@@ -64,7 +64,7 @@ The demo site is ready on [my AWS demo site](#demo-site-url); you can try any AP
 
 ### C.1. ERD
 
-My ERD [erd-link](#erd-link).
+My ERD [erd-link](https://dbdiagram.io/d/KD-System-ERD-YF-67ee530c4f7afba1843478f5).
 
 ### C.2. Technical Document
 
