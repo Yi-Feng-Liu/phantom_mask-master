@@ -1,16 +1,15 @@
 from utils.db_models import Pharmacies, PharmaciesCash, PharmaciesMask, Users, UsersPurchaseHistory
 from utils.etl_modules import ParsePharmaciesInfo, ParseUserInfo
-import json
 from utils.db_models import Base
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import inspect
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy import inspect, text
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import sessionmaker
-import asyncio
-from sqlalchemy import text
 from utils.logger import logger
 from typing import AsyncGenerator
+import json
+import asyncio
+from sqlalchemy.future import select
 
 
 class DatabaseConfig:
@@ -24,12 +23,12 @@ class DatabaseConfig:
 
     @property
     def async_database_url(self):
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/postgres"
+        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/mydatabase"
 
 
     @property
     def sync_database_url(self):
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/postgres"
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/mydatabase"
 
 
 
@@ -63,56 +62,49 @@ class DatabaseManager:
             
             
     async def check_n_create_tables(self):
-        async with self.engine.begin() as conn:
-            result = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
-            logger.info(f'There are {len(result)} tables in the database: ')
-            for table_name in result:
-                logger.info(f"Table Name: {table_name}")
-            
+        try:
+            async with self.engine.begin() as conn:
+                # 獲取現有表
+                result = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+                logger.info(f'There are {len(result)} tables in the database.')
 
-            # Check if tables exist
-            tables_to_create = [
-                table_name for table_name in Base.metadata.tables.keys() if table_name not in result
-            ]
-            
-            # Create tables if they do not exist
-            if tables_to_create:
-                logger.info(f"Does not exist table: {tables_to_create} Creating...")
-                try:
-                    await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, tables=[Base.metadata.tables[table_name] for table_name in tables_to_create]))
-                    logger.info("Tables created successfully")
-                    
-                    result_after_creation = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
-                    created_tables = [table_name for table_name in result_after_creation]
+                tables_to_create = [
+                    table_name for table_name in Base.metadata.tables.keys() if table_name not in result
+                ]
 
-                    if created_tables:
-                        logger.info(f"Successfully created tables: {created_tables}")
-                    else:
-                        logger.error("Failed to verify table creation. Some tables may not have been created.")
-                        
-                except Exception as e:
-                    logger.error(f"Failed to create tables: {e}")
-            else:
-                logger.info("All the Table has been created !")
+                if tables_to_create:
+                    logger.info(f"Missing tables: {tables_to_create}. Creating...")
+                    await conn.run_sync(lambda sync_conn: Base.metadata.create_all(
+                        sync_conn, tables=[Base.metadata.tables[table_name] for table_name in tables_to_create]
+                    ))
+                    logger.info("Tables created successfully.")
+
+                else:
+                    logger.info("All tables are already created!")
+
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
 
                    
     async def check_n_create_database(self):
         async with self.engine.begin() as conn:
             try:
+                # 檢查資料庫是否存在
                 result = await conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": self.config.db_name})
                 if result.scalar():
                     logger.info(f"Database {self.config.db_name} already exists")
                 else:
+                    # 創建資料庫
                     await conn.execute(text(f'CREATE DATABASE "{self.config.db_name}"'))
                     
-                    # Check if the database was created successfully
+                    # 檢查資料庫創建是否成功
                     result_check = await conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": self.config.db_name})
                     if result_check.scalar():
                         logger.info(f"Database {self.config.db_name} has been created")
                     else:
                         logger.error(f"Database {self.config.db_name} creation failed")
             except Exception as e:
-                logger.info(f"Can not connect to PostgreSQL. Please check your configuration: {type(e).__name__}, {e}")
+                logger.error(f"Cannot connect to PostgreSQL. Please check your configuration: {type(e).__name__}, {e}")
 
     
     @asynccontextmanager
@@ -146,12 +138,11 @@ class DatabaseManager:
 
 
 async def get_db() -> DatabaseManager:
-    from time import sleep
     db_config = DatabaseConfig(
         user="postgres",
         password="admin",
-        host="localhost",
-        port=55688,
+        host="10.88.26.119",
+        port=5432,
         db_name="mydatabase"
     )
 
@@ -159,9 +150,6 @@ async def get_db() -> DatabaseManager:
 
     try:
         await db_manager.init_pool()
-        await db_manager.init_sync_tables()
-        logger.info("Database pool & tables initialized")
-        sleep(0.5)
         await db_manager.check_n_create_database()
         await db_manager.check_n_create_tables()
         return db_manager
@@ -182,7 +170,6 @@ def load_json_file(file_path):
         
 async def Insert_pharmacies_data_to_db():
     db_manager = await get_db()
-    # users_data = load_json_file("./data/users.json")
     pharmacies_data = load_json_file("./data/pharmacies.json")
     
     if db_manager:
@@ -198,10 +185,75 @@ async def Insert_pharmacies_data_to_db():
             pharmacy_mask_info = await pharmacy_info.get_mask_info()
             for mask_info in pharmacy_mask_info:
                 await db_manager.insert_data(PharmaciesMask, mask_info)
-            
+
+
+async def Insert_users_data_to_db():
+    db_manager = await get_db()
+    users_data = load_json_file("./data/users.json")
+    if db_manager:
+        async with db_manager.get_session() as session:
+            for user in users_data:
+                user_info = ParseUserInfo(user)
+                user_cash_info = await user_info.get_user_n_balance_info()
+                await db_manager.insert_data(Users, user_cash_info)
+
+                
+                purchase_history = user_info.get_user_purchase_history()
+                async for history in purchase_history:
+                    # Step 1: Query the Users table to retrieve the corresponding ID for the user_id
+                    result = await session.execute(
+                        select(Users).filter(Users.name == history["user_id"])
+                    )
+                    user = result.scalars().first() 
+                    if user is None:
+                        raise Exception("User not found")
+
+                    # Step 2: Query the Pharmacies table to retrieve the corresponding ID for the pharmacies_id
+                    result = await session.execute(
+                        select(Pharmacies).filter(Pharmacies.name == history["pharmacies"])
+                    )
+                    pharmacy = result.scalars().first() 
+                    if pharmacy is None:
+                        raise Exception("Pharmacy not found")
+
+                    # Step 3: Query the pharmacies_mask table to retrieve the corresponding ID for the pharmacies_mask_id
+                    mask_data = history["pharmacies_mask"]
+                    result = await session.execute(
+                        select(PharmaciesMask).filter(
+                            PharmaciesMask.mask_name == mask_data["mask_name"],
+                            PharmaciesMask.mask_color == mask_data["mask_color"],
+                            PharmaciesMask.pack_quantity == mask_data["pack_quantity"]
+                        )
+                    )
+                    pharmacy_mask = result.scalars().first() 
+                    if pharmacy_mask is None:
+                        raise Exception("Mask not found")
+
+                    # Step 4: Prepare to insert updated data into the UsersPurchaseHistory table
+                    new_purchase_history = {
+                        "user_id": user.id,
+                        "pharmacies": pharmacy.id,
+                        "pharmacies_mask": pharmacy_mask.id,
+                        "trn_amount": history["trn_amount"],
+                        "trn_date": history["trn_date"]
+                    }
+                    
+                    await db_manager.insert_data(UsersPurchaseHistory, new_purchase_history)
+
+
+
+async def main():
+    await Insert_pharmacies_data_to_db()
+    await Insert_users_data_to_db()
+
+
 
 
 if __name__ == "__main__":
-    # init_tables()
-    asyncio.run(get_db())
+    
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+
+
+
  
