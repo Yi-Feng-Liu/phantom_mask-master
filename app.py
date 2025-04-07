@@ -11,7 +11,7 @@ from utils.db_models import Pharmacies, PharmaciesCash, PharmaciesMask, Users, U
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_manager = await get_db()  
+    db_manager = await get_db(False)  
     await db_manager.check_n_create_database()
     yield
     await db_manager.close()  
